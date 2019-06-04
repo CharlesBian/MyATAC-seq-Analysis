@@ -1,0 +1,126 @@
+---
+title: "ATAC_DESeq"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## GitHub Documents
+## Library the Packages
+```{r,echo=FALSE}
+
+library(RColorBrewer)
+library(Rmisc)
+library(ggplot2)
+library(gridExtra)
+library(cowplot)
+library(data.table)
+library(dplyr)
+library(lattice)
+library(tidyr)
+library(DESeq2)
+library(DESeq)
+```
+
+#########################################################
+### in/out files
+#########################################################
+
+```{r}
+rm(list = ls())
+
+getwd()
+
+path_ins = list.files(pattern = '.*rp10m.bed');
+length(path_ins)
+print(path_ins)
+path_out = "C:/Users/77214/Desktop/ATAC/DEseq/"
+```
+
+# read gene lists
+#creat empty matrix
+```{r}
+matrix <- data.frame(matrix(ncol = 3+length(path_ins), nrow = 94526))
+
+total = c("Chr","Start","End");
+for (x in 1:length(path_ins)) {
+    num1 = gsub('_cvg_rp10m.bed','',path_ins[x]);
+    total = append(total, num1);
+  }
+
+colnames(matrix) = total
+```
+
+### Reading in data 
+```{r}
+i=1
+for (i in 1:length(path_ins)) {
+  data= read.delim(paste0(path_in,path_ins[i]),skip=0, header=FALSE,sep = "\t", check.names = FALSE);
+  num1 = gsub('_cvg_rp10m.bed','',path_ins[i]);
+  matrix[,num1]  = data[,9]
+  
+}
+matrix[,1]  = data[,1]
+matrix[,2]  = data[,2]
+matrix[,3]  = data[,3]
+```
+
+#### write file 
+```{r}
+file_out = 'All.txt'
+write.table(matrix,file=paste(path_out,file_out,sep=''),sep='\t',quote=F,row.names = FALSE,col.names = TRUE)
+```
+
+
+######round#####
+```{r}
+matrix2 = matrix
+matrix[,4:6] = round(matrix[,4:6],0)
+```
+
+######Deseq2 analysis #######
+```{r}
+type <- factor(c(rep("CTRL",1), rep("AOAA",1)))
+AOAA = matrix[,c(4,5)]
+AOAA <- AOAA %>% select(2,1)
+AOAA = AOAA + 1
+AOAA <- as.matrix(AOAA)
+colData <- data.frame(row.names=colnames(AOAA), type)
+cds <- newCountDataSet(AOAA,type)
+bbs <-  estimateSizeFactors(cds)
+cds <- estimateDispersions(bbs, method='blind' ,sharingMode="fit-only", fitType = 'local')
+res <- nbinomTest(cds,"CTRL","AOAA")
+res2 = cbind(matrix[,1:3],res)
+res2 = res2[,-4]
+head(res2)
+length(res2)
+plotMA(res2)
+```
+
+
+##volcano plot
+```{r}
+
+UP <-subset(res2,log2FoldChange > 1 & pval < 0.05, select=c(1,2,3,8,9,10))#####pval < 0.05 & 
+Down <-subset(res2,log2FoldChange < -1 & pval < 0.05,select=c(1,2,3,8,9,10))#####pval < 0.05 & 
+DE_ALL <- subset(res2, log2FoldChange > -1 & log2FoldChange < 1 & pval < 0.05,select=c(1,2,3,8,9,10))
+write.csv(UP,file=paste0(path_out,"AOAA_up.csv"),sep='\t',quote=F,row.names = FALSE)
+write.csv(Down,file=paste0(path_out,'AOAA_down.csv'),sep='\t',quote=F,row.names = FALSE)
+
+write.csv(DE_ALL,file=paste0(path_out,"AOAA_DE_ALL.csv"),sep='\t',quote=F,row.names = FALSE)
+
+pdf("AOAA.pdf")
+res2$change <- as.factor(ifelse(res2$pval < 0.05 & abs(res2$log2FoldChange) > 1,ifelse(res2$log2FoldChange > 1,'UP','DOWN'),'NOT')) 
+
+p <- ggplot(res2, aes(x = log2FoldChange, y = -log10(pval), color = change))+geom_point(alpha=0.8, size = 1)+scale_color_manual(values =c("blue","black","red"))+ geom_hline(yintercept = -log10(0.05),lty=4,lwd=0.6,alpha=0.8)+ geom_vline(xintercept = c(1,-1),lty=4,lwd=0.6,alpha=0.8)+xlim(-9,9) + labs(title="Volcanoplot")+ theme_bw(base_size = 18)+theme(panel.grid.minor = element_blank(),panel.grid.major = element_blank())
+p
+dev.off()
+```
+
+
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

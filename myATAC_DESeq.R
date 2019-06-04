@@ -1,8 +1,3 @@
-##############################################################################
-# TODO: calcuate overlap between enhancers and tf
-#	By Jialiang Huang 20150313
-###############################################################################
-
 #source("http://bioconductor.org/biocLite.R")
 #options(BioC_mirror="https://mirrors.ustc.edu.cn/bioc/")
 #BiocInstaller::biocLite("Rmisc")
